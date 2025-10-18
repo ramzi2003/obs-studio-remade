@@ -2,6 +2,7 @@
 #include <QAction>
 
 #include <windows.h>
+
 #include <obs-frontend-api.h>
 #include "captions.hpp"
 #include "captions-handler.hpp"

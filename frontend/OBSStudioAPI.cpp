@@ -6,6 +6,8 @@
 
 #include <qt-wrappers.hpp>
 
+// using namespace std; // Removed to avoid byte conflict with Windows headers
+
 extern volatile bool streaming_active;
 extern volatile bool recording_active;
 extern volatile bool recording_paused;
@@ -13,7 +15,7 @@ extern volatile bool replaybuf_active;
 extern volatile bool virtualcam_active;
 
 template<typename T>
-inline size_t GetCallbackIdx(vector<OBSStudioCallback<T>> &callbacks, T callback, void *private_data)
+inline size_t GetCallbackIdx(std::vector<OBSStudioCallback<T>> &callbacks, T callback, void *private_data)
 {
 	for (size_t i = 0; i < callbacks.size(); i++) {
 		OBSStudioCallback<T> curCB = callbacks[i];

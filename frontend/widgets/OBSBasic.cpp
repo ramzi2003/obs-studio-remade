@@ -62,13 +62,13 @@
 #ifdef _WIN32
 #include <sstream>
 #endif
-#include <string>
-#include <unordered_set>
-
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include "Windows.h"
 #endif
+
+#include <string>
+#include <unordered_set>
 
 #include "moc_OBSBasic.cpp"
 
@@ -2084,4 +2084,22 @@ OBSPromptResult OBSBasic::PromptForName(const OBSPromptRequest &request, const O
 void OBSBasic::on_actionOpenPluginManager_triggered()
 {
 	App()->pluginManagerOpenDialog();
+}
+
+void OBSBasic::hideDockWidgets()
+{
+	ui->scenesDock->setVisible(false);
+	ui->sourcesDock->setVisible(false);
+	ui->mixerDock->setVisible(false);
+	ui->transitionsDock->setVisible(false);
+	controlsDock->setVisible(false);
+}
+
+void OBSBasic::showDockWidgets()
+{
+	ui->scenesDock->setVisible(true);
+	ui->sourcesDock->setVisible(true);
+	ui->mixerDock->setVisible(true);
+	ui->transitionsDock->setVisible(true);
+	controlsDock->setVisible(true);
 }

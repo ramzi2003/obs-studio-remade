@@ -370,46 +370,8 @@ void TaskbarOverlayInit()
 
 void TaskbarOverlaySetStatus(TaskbarOverlayStatus status)
 {
-	ITaskbarList4 *taskbarIcon;
-	auto hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbarIcon));
-
-	if (FAILED(hr)) {
-		taskbarIcon->Release();
-		return;
-	}
-
-	hr = taskbarIcon->HrInit();
-
-	if (FAILED(hr)) {
-		taskbarIcon->Release();
-		return;
-	}
-
-	QIcon qicon;
-	switch (status) {
-	case TaskbarOverlayStatusActive:
-		qicon = QIcon::fromTheme("obs-active", QIcon(":/res/images/active.png"));
-		break;
-	case TaskbarOverlayStatusPaused:
-		qicon = QIcon::fromTheme("obs-paused", QIcon(":/res/images/paused.png"));
-		break;
-	case TaskbarOverlayStatusInactive:
-		taskbarIcon->SetOverlayIcon(hwnd, nullptr, nullptr);
-		taskbarIcon->Release();
-		return;
-	}
-
-	HICON hicon = nullptr;
-	if (!qicon.isNull()) {
-		Q_GUI_EXPORT HICON qt_pixmapToWinHICON(const QPixmap &p);
-		hicon = qt_pixmapToWinHICON(qicon.pixmap(GetSystemMetrics(SM_CXSMICON)));
-		if (!hicon)
-			return;
-	}
-
-	taskbarIcon->SetOverlayIcon(hwnd, hicon, nullptr);
-	DestroyIcon(hicon);
-	taskbarIcon->Release();
+	// Disabled - no taskbar overlay icons
+	return;
 }
 
 bool HighContrastEnabled()

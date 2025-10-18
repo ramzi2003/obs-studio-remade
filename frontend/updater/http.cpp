@@ -14,18 +14,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "Updater.hpp"
+#include "updater.hpp"
 
 #include <algorithm>
 
-using namespace std;
+// using namespace std; // Removed to avoid byte conflict with Windows headers
 
 #define MAX_BUF_SIZE 262144
 #define READ_BUF_SIZE 32768
 
 /* ------------------------------------------------------------------------ */
 
-static bool ReadHTTPData(string &responseBuf, const uint8_t *buffer, DWORD outSize)
+static bool ReadHTTPData(std::string &responseBuf, const uint8_t *buffer, DWORD outSize)
 {
 	try {
 		responseBuf.append((const char *)buffer, outSize);
@@ -36,7 +36,7 @@ static bool ReadHTTPData(string &responseBuf, const uint8_t *buffer, DWORD outSi
 }
 
 bool HTTPPostData(const wchar_t *url, const BYTE *data, int dataLen, const wchar_t *extraHeaders, int *responseCode,
-		  string &responseBuf)
+		  std::string &responseBuf)
 {
 	HttpHandle hSession;
 	HttpHandle hConnect;
@@ -326,7 +326,7 @@ bool HTTPGetFile(HINTERNET hConnect, const wchar_t *url, const wchar_t *outputPa
 	return true;
 }
 
-bool HTTPGetBuffer(HINTERNET hConnect, const wchar_t *url, const wchar_t *extraHeaders, vector<std::byte> &out,
+bool HTTPGetBuffer(HINTERNET hConnect, const wchar_t *url, const wchar_t *extraHeaders, std::vector<uint8_t> &out,
 		   int *responseCode)
 {
 	HttpHandle hRequest;
@@ -423,7 +423,7 @@ bool HTTPGetBuffer(HINTERNET hConnect, const wchar_t *url, const wchar_t *extraH
 			if (!outSize)
 				break;
 
-			out.insert(out.end(), (std::byte *)buffer, (std::byte *)buffer + outSize);
+			out.insert(out.end(), (uint8_t *)buffer, (uint8_t *)buffer + outSize);
 
 			completedFileSize += outSize;
 			int position = (int)(((float)completedFileSize / (float)totalFileSize) * 100.0f);

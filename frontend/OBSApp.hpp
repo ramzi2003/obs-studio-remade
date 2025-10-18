@@ -29,6 +29,7 @@
 #include <QPalette>
 #include <QPointer>
 #include <QUuid>
+#include "recording-overlay.hpp"
 
 #include <deque>
 #include <functional>
@@ -71,6 +72,7 @@ private:
 	ConfigFile userConfig;
 	TextLookup textLookup;
 	QPointer<OBSMainWindow> mainWindow;
+	QPointer<RecordingOverlay> recordingOverlay;
 	profiler_name_store_t *profilerNameStore = nullptr;
 	std::vector<UpdateBranch> updateBranches;
 	bool branches_loaded = false;
@@ -137,10 +139,14 @@ public:
 
 	void UpdateHotkeyFocusSetting(bool reset = true);
 	void DisableHotkeys();
-
-	inline bool HotkeysEnabledInFocus() const { return enableHotkeysInFocus; }
-
-	inline QMainWindow *GetMainWindow() const { return mainWindow.data(); }
+	
+	// Recording overlay methods
+	void showRecordingOverlay();
+	void hideRecordingOverlay();
+	void onRecordingStarted();
+	void onRecordingStopped();
+	void onRecordingPaused();
+	void onRecordingResumed();
 
 	inline config_t *GetAppConfig() const { return appConfig; }
 	inline config_t *GetUserConfig() const { return userConfig; }
@@ -210,6 +216,14 @@ public:
 	inline void PushUITranslation(obs_frontend_translate_ui_cb cb) { translatorHooks.emplace_front(cb); }
 
 	inline void PopUITranslation() { translatorHooks.pop_front(); }
+
+	// Main window accessor
+	OBSMainWindow *GetMainWindow() const { return mainWindow; }
+
+	// Hotkey state accessors
+	bool HotkeysEnabledInFocus() const { return enableHotkeysInFocus; }
+	bool HotkeysEnabledOutOfFocus() const { return enableHotkeysOutOfFocus; }
+
 #ifndef _WIN32
 	static void SigIntSignalHandler(int);
 #endif

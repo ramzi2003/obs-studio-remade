@@ -19,9 +19,9 @@
 #include <util/windows/WinHandle.hpp>
 #include <vector>
 
-using namespace std;
+// using namespace std; // Removed to avoid byte conflict with Windows headers
 
-void HashToString(const B2Hash &in, string &out)
+void HashToString(const B2Hash &in, std::string &out)
 {
 	constexpr char alphabet[] = "0123456789abcdef";
 	out.resize(kBlake2StrLength);
@@ -32,20 +32,20 @@ void HashToString(const B2Hash &in, string &out)
 	}
 }
 
-void StringToHash(const string &in, B2Hash &out)
+void StringToHash(const std::string &in, B2Hash &out)
 {
 	unsigned int temp;
 	const char *str = in.c_str();
 
 	for (size_t i = 0; i < kBlake2HashLength; i++) {
 		sscanf_s(str + i * 2, "%02x", &temp);
-		out[i] = static_cast<std::byte>(temp);
+		out[i] = static_cast<uint8_t>(temp);
 	}
 }
 
 bool CalculateFileHash(const wchar_t *path, B2Hash &hash)
 {
-	static __declspec(thread) vector<BYTE> hashBuffer;
+	static __declspec(thread) std::vector<BYTE> hashBuffer;
 	blake2b_state blake2;
 	if (blake2b_init(&blake2, kBlake2HashLength) != 0)
 		return false;

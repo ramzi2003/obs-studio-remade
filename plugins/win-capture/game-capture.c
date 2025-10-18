@@ -583,6 +583,9 @@ extern void wait_for_hook_initialization(void);
 static void *game_capture_create(obs_data_t *settings, obs_source_t *source)
 {
 	struct game_capture *gc = bzalloc(sizeof(*gc));
+	
+	// Initialize custom cursor
+	cursor_data_init(&gc->cursor_data);
 
 	wait_for_hook_initialization();
 
@@ -1674,10 +1677,8 @@ static void check_foreground_window(struct game_capture *gc, float seconds)
 	if (gc->cursor_check_time >= 0.1f) {
 		DWORD foreground_process_id;
 		GetWindowThreadProcessId(GetForegroundWindow(), &foreground_process_id);
-		if (gc->process_id != foreground_process_id)
-			gc->cursor_hidden = true;
-		else
-			gc->cursor_hidden = false;
+		// Hide cursor when game is not focused
+		gc->cursor_hidden = (foreground_process_id != gc->process_id);
 		gc->cursor_check_time = 0.0f;
 	}
 }
@@ -1858,7 +1859,7 @@ static inline void game_capture_render_cursor(struct game_capture *gc)
 	if (previous)
 		gc->set_thread_dpi_awareness_context(previous);
 
-	cursor_draw(&gc->cursor_data, -p.x, -p.y, gc->global_hook_info->cx, gc->global_hook_info->cy);
+	cursor_draw(&gc->cursor_data, -p.x, -p.y, gc->global_hook_info->cx, gc->global_hook_info->cy, gc->cursor_hidden);
 }
 
 static void game_capture_render(void *data, gs_effect_t *unused)

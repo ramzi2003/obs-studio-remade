@@ -30,12 +30,12 @@
 #include <unordered_set>
 #include <queue>
 
-using namespace std;
+// using namespace std; // Removed to avoid byte conflict with Windows headers
 using namespace updater;
 
 /* ----------------------------------------------------------------------- */
 
-constexpr const string_view kCDNUrl = "https://cdn-fastly.obsproject.com/";
+constexpr const std::string_view kCDNUrl = "https://cdn-fastly.obsproject.com/";
 constexpr const wchar_t *kCDNHostname = L"cdn-fastly.obsproject.com";
 constexpr const wchar_t *kCDNUpdateBaseUrl = L"https://cdn-fastly.obsproject.com/update_studio";
 constexpr const wchar_t *kPatchManifestURL = L"https://obsproject.com/update_studio/getpatchmanifest";
@@ -78,7 +78,7 @@ static bool IsVSRedistOutdated()
 {
 	VS_FIXEDFILEINFO *info = nullptr;
 	UINT len = 0;
-	vector<std::byte> buf;
+	std::vector<uint8_t> buf;
 
 	const wchar_t vc_dll[] = L"msvcp140";
 
@@ -149,7 +149,7 @@ try {
 	return false;
 }
 
-static void MyDeleteFile(const wstring &filename)
+static void MyDeleteFile(const std::wstring &filename)
 {
 	/* Try straightforward delete first */
 	if (DeleteFile(filename.c_str()))
@@ -185,9 +185,9 @@ static bool IsSafeFilename(const wchar_t *path)
 	return true;
 }
 
-static string QuickReadFile(const wchar_t *path)
+static std::string QuickReadFile(const wchar_t *path)
 {
-	string data;
+	std::string data;
 
 	WinHandle handle = CreateFileW(path, GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
 	if (!handle.Valid()) {
@@ -252,10 +252,10 @@ enum state_t {
 };
 
 struct update_t {
-	wstring sourceURL;
-	wstring outputPath;
-	wstring previousFile;
-	string packageName;
+	std::wstring sourceURL;
+	std::wstring outputPath;
+	std::wstring previousFile;
+	std::string packageName;
 
 	B2Hash hash;
 	B2Hash my_hash;
@@ -305,8 +305,8 @@ struct update_t {
 };
 
 struct deletion_t {
-	wstring originalFilename;
-	wstring deleteMeFilename;
+	std::wstring originalFilename;
+	std::wstring deleteMeFilename;
 
 	void UndoRename() const
 	{
@@ -315,11 +315,11 @@ struct deletion_t {
 	}
 };
 
-static unordered_map<B2Hash, vector<std::byte>> download_data;
-static unordered_map<string, B2Hash> hashes;
-static vector<update_t> updates;
-static vector<deletion_t> deletions;
-static mutex updateMutex;
+static std::unordered_map<B2Hash, std::vector<uint8_t>> download_data;
+static std::unordered_map<std::string, B2Hash> hashes;
+static std::vector<update_t> updates;
+static std::vector<deletion_t> deletions;
+static std::mutex updateMutex;
 
 static inline void CleanupPartialUpdates()
 {
@@ -332,10 +332,10 @@ static inline void CleanupPartialUpdates()
 
 /* ----------------------------------------------------------------------- */
 
-static int Decompress(ZSTD_DCtx *ctx, std::vector<std::byte> &buf, size_t size)
+static int Decompress(ZSTD_DCtx *ctx, std::vector<uint8_t> &buf, size_t size)
 {
 	// Copy compressed data
-	vector<std::byte> comp(buf.begin(), buf.end());
+	std::vector<uint8_t> comp(buf.begin(), buf.end());
 
 	try {
 		buf.resize(size);
@@ -389,7 +389,7 @@ bool DownloadWorkerThread()
 	for (;;) {
 		bool foundWork = false;
 
-		unique_lock<mutex> ulock(updateMutex);
+		std::unique_lock<std::mutex> ulock(updateMutex);
 
 		for (update_t &update : updates) {
 			int responseCode;
@@ -476,13 +476,13 @@ bool DownloadWorkerThread()
 
 static bool RunDownloadWorkers(int num)
 try {
-	vector<future<bool>> thread_success_results;
+	std::vector<std::future<bool>> thread_success_results;
 	thread_success_results.resize(num);
 
-	for (future<bool> &result : thread_success_results) {
-		result = async(DownloadWorkerThread);
+	for (std::future<bool> &result : thread_success_results) {
+		result = std::async(DownloadWorkerThread);
 	}
-	for (future<bool> &result : thread_success_results) {
+	for (std::future<bool> &result : thread_success_results) {
 		if (!result.get()) {
 			return false;
 		}
@@ -583,11 +583,11 @@ static inline bool WideToUTF8(char *utf8, int utf8Size, const wchar_t *wide)
 
 /* ----------------------------------------------------------------------- */
 
-queue<string> hashQueue;
+	std::queue<std::string> hashQueue;
 
 void HasherThread()
 {
-	unique_lock ulock(updateMutex, defer_lock);
+	std::unique_lock<std::mutex> ulock(updateMutex, std::defer_lock);
 
 	while (true) {
 		ulock.lock();
@@ -615,7 +615,7 @@ void HasherThread()
 	}
 }
 
-static void RunHasherWorkers(int num, const vector<Package> &packages)
+static void RunHasherWorkers(int num, const std::vector<Package> &packages)
 try {
 
 	for (const Package &package : packages) {
@@ -624,11 +624,11 @@ try {
 		}
 	}
 
-	vector<future<void>> futures;
+	std::vector<std::future<void>> futures;
 	futures.resize(num);
 
 	for (auto &result : futures) {
-		result = async(launch::async, HasherThread);
+		result = std::async(std::launch::async, HasherThread);
 	}
 	for (auto &result : futures) {
 		result.wait();
@@ -746,7 +746,7 @@ static bool AddPackageUpdateFiles(const Package &package, const wchar_t *branch)
 
 static void AddPackageRemovedFiles(const Package &package)
 {
-	for (const string &filename : package.removed_files) {
+	for (const std::string &filename : package.removed_files) {
 		wchar_t removedFileName[MAX_PATH];
 		if (!UTF8ToWideBuf(removedFileName, filename.c_str()))
 			continue;
@@ -776,7 +776,7 @@ static bool RenameRemovedFile(deletion_t &deletion)
 
 	BYTE junk[40];
 	B2Hash hash;
-	string temp;
+	std::string temp;
 
 	CryptGenRandom(hProvider, sizeof(junk), junk);
 	blake2b(hash.data(), hash.size(), junk, sizeof(junk), nullptr, 0);
@@ -810,11 +810,11 @@ static void UpdateWithPatchIfAvailable(const PatchResponse &patch)
 	if (patch.source.compare(0, kCDNUrl.size(), kCDNUrl) != 0)
 		return;
 
-	if (patch.name.find('/') == string::npos)
+	if (patch.name.find('/') == std::string::npos)
 		return;
 
-	string patchPackageName(patch.name, 0, patch.name.find('/'));
-	string fileName(patch.name, patch.name.find('/') + 1);
+	std::string patchPackageName(patch.name, 0, patch.name.find('/'));
+	std::string fileName(patch.name, patch.name.find('/') + 1);
 
 	if (!UTF8ToWideBuf(widePatchableFilename, fileName.c_str()))
 		return;
@@ -847,7 +847,7 @@ static bool MoveInUseFileAway(const update_t &file)
 
 	BYTE junk[40];
 	B2Hash hash;
-	string temp;
+	std::string temp;
 
 	CryptGenRandom(hProvider, sizeof(junk), junk);
 	blake2b(hash.data(), hash.size(), junk, sizeof(junk), nullptr, 0);
@@ -883,7 +883,7 @@ static bool UpdateFile(ZSTD_DCtx *ctx, update_t &file)
 	wchar_t oldFileRenamedPath[MAX_PATH];
 
 	/* Grab the patch/file data from the global cache. */
-	vector<std::byte> &patch_data = download_data[file.downloadHash];
+	std::vector<uint8_t> &patch_data = download_data[file.downloadHash];
 
 	/* Check if we're replacing an existing file or just installing a new
 	 * one */
@@ -997,8 +997,8 @@ static bool UpdateFile(ZSTD_DCtx *ctx, update_t &file)
 
 		/* We may be installing into new folders,
 		 * make sure they exist */
-		filesystem::path filePath(file.outputPath.c_str());
-		create_directories(filePath.parent_path());
+		std::filesystem::path filePath(file.outputPath.c_str());
+		std::filesystem::create_directories(filePath.parent_path());
 
 		file.previousFile = L"";
 
@@ -1016,14 +1016,14 @@ static bool UpdateFile(ZSTD_DCtx *ctx, update_t &file)
 	return true;
 }
 
-queue<reference_wrapper<update_t>> updateQueue;
+std::queue<std::reference_wrapper<update_t>> updateQueue;
 static int lastPosition = 0;
 static int installed = 0;
 static bool updateThreadFailed = false;
 
 static bool UpdateWorker()
 {
-	unique_lock<mutex> ulock(updateMutex, defer_lock);
+	std::unique_lock<std::mutex> ulock(updateMutex, std::defer_lock);
 	ZSTDDCtx zCtx;
 
 	while (true) {
@@ -1058,13 +1058,13 @@ try {
 	for (update_t &update : updates)
 		updateQueue.emplace(update);
 
-	vector<future<bool>> thread_success_results;
+	std::vector<std::future<bool>> thread_success_results;
 	thread_success_results.resize(num);
 
-	for (future<bool> &result : thread_success_results) {
-		result = async(launch::async, UpdateWorker);
+	for (std::future<bool> &result : thread_success_results) {
+		result = std::async(std::launch::async, UpdateWorker);
 	}
-	for (future<bool> &result : thread_success_results) {
+	for (std::future<bool> &result : thread_success_results) {
 		if (!result.get()) {
 			return false;
 		}
@@ -1114,7 +1114,7 @@ static bool UpdateVSRedists()
 
 	Status(L"Downloading Visual C++ Redistributable");
 
-	wstring destPath;
+	std::wstring destPath;
 	destPath += tempPath;
 	destPath += L"\\VC_redist.x64.exe";
 
@@ -1221,7 +1221,7 @@ static void ClearShaderCache()
 	wchar_t shader_path[MAX_PATH];
 	SHGetFolderPathW(NULL, CSIDL_COMMON_APPDATA, NULL, SHGFP_TYPE_CURRENT, shader_path);
 	StringCbCatW(shader_path, sizeof(shader_path), L"\\obs-studio\\shader-cache");
-	filesystem::remove_all(shader_path);
+	std::filesystem::remove_all(shader_path);
 }
 
 extern "C" void UpdateHookFiles(void);
@@ -1276,8 +1276,8 @@ static bool Update(wchar_t *cmdLine)
 	 * Check if updating portable build      */
 
 	bool bIsPortable = false;
-	wstring branch = L"stable";
-	wstring appdata;
+	std::wstring branch = L"stable";
+	std::wstring appdata;
 
 	if (cmdLine[0]) {
 		int argc;
@@ -1364,7 +1364,7 @@ static bool Update(wchar_t *cmdLine)
 
 	Manifest manifest;
 	{
-		string manifestFile = QuickReadFile(manifestPath);
+		std::string manifestFile = QuickReadFile(manifestPath);
 		if (manifestFile.empty()) {
 			Status(L"Update failed: Couldn't load manifest file");
 			return false;
@@ -1432,10 +1432,10 @@ static bool Update(wchar_t *cmdLine)
 		if (!WideToUTF8Buf(outputPath, update.outputPath.c_str()))
 			continue;
 
-		string hash_string;
+		std::string hash_string;
 		HashToString(update.my_hash, hash_string);
 
-		string package_path;
+		std::string package_path;
 		package_path = update.packageName;
 		package_path += "/";
 		package_path += outputPath;
@@ -1446,14 +1446,14 @@ static bool Update(wchar_t *cmdLine)
 	/* ------------------------------------- *
 	 * Send file hashes                      */
 
-	string newManifest;
+	std::string newManifest;
 	if (!files.empty()) {
 		json request = files;
-		string post_body = request.dump();
+		std::string post_body = request.dump();
 
 		int len = (int)post_body.size();
 		size_t compressSize = ZSTD_compressBound(len);
-		string compressedJson;
+		std::string compressedJson;
 
 		compressedJson.resize(compressSize);
 
@@ -1465,7 +1465,7 @@ static bool Update(wchar_t *cmdLine)
 
 		compressedJson.resize(result);
 
-		wstring manifestUrl(kPatchManifestURL);
+		std::wstring manifestUrl(kPatchManifestURL);
 		if (branch != L"stable")
 			manifestUrl += L"?branch=" + branch;
 
@@ -1507,7 +1507,7 @@ static bool Update(wchar_t *cmdLine)
 	/* ------------------------------------- *
 	 * Deduplicate Downloads                 */
 
-	unordered_set<B2Hash> downloadHashes;
+	std::unordered_set<B2Hash> downloadHashes;
 	for (update_t &update : updates) {
 		if (downloadHashes.count(update.downloadHash)) {
 			update.state = STATE_ALREADY_DOWNLOADED;
@@ -1758,7 +1758,7 @@ static int RestartAsAdmin(LPCWSTR lpCmdLine, LPCWSTR cwd)
 
 	/* If the admin is a different user, add the path to the user's
 	 * AppData to the command line so we can load the correct manifest. */
-	wstring elevatedCmdLine(lpCmdLine);
+	std::wstring elevatedCmdLine(lpCmdLine);
 	CoTaskMemPtr<wchar_t> pOut;
 	HRESULT hr = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, nullptr, &pOut);
 	if (hr == S_OK) {

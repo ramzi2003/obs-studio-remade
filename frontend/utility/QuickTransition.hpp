@@ -20,8 +20,7 @@
 #include <obs.hpp>
 
 #include <QMetaType>
-
-using namespace std;
+#include <memory>
 
 class QPushButton;
 

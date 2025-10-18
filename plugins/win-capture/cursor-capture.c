@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <obs.h>
+#include <obs-module.h>
 #include "cursor-capture.h"
 
 static uint8_t *get_bitmap_data(HBITMAP hbmp, BITMAP *bmp)
@@ -221,28 +222,130 @@ void cursor_capture(struct cursor_data *data)
 	DestroyIcon(icon);
 }
 
-void cursor_draw(struct cursor_data *data, long x_offset, long y_offset, long width, long height)
+void cursor_draw(struct cursor_data *data, long x_offset, long y_offset, long width, long height, bool force_png)
 {
 	long x = data->cursor_pos.x + x_offset;
 	long y = data->cursor_pos.y + y_offset;
-	long x_draw = x - data->x_hotspot;
-	long y_draw = y - data->y_hotspot;
+	
+	// Check if cursor is inside the window
+	bool inside_window = (x >= 0 && x <= width && y >= 0 && y <= height);
+	
+	gs_texture_t *cursor_texture;
+	uint32_t cursor_cx, cursor_cy;
+	long hotspot_x, hotspot_y;
+	
+	// Update last valid position if cursor is inside
+	if (inside_window) {
+		data->last_valid_pos.x = x;
+		data->last_valid_pos.y = y;
+		data->has_valid_pos = true;
+	}
+	
+	// Use PNG cursor if forced (window not focused) or cursor is outside window
+	if (force_png || !inside_window) {
+		// Use frozen position if outside window or no valid position yet
+		if (!inside_window && data->has_valid_pos) {
+			x = data->last_valid_pos.x;
+			y = data->last_valid_pos.y;
+			
+			// Clamp to window boundaries
+			if (x < 0) x = 0;
+			if (x > width) x = width;
+			if (y < 0) y = 0;
+			if (y > height) y = height;
+		} else if (!inside_window) {
+			// Never entered the window, don't draw cursor
+			blog(LOG_INFO, "[cursor_draw] No valid position - not drawing");
+			return;
+		}
+		
+		// Use PNG cursor if available, otherwise fallback to system cursor
+		if (data->custom_cursor_texture) {
+			cursor_texture = data->custom_cursor_texture;
+			cursor_cx = data->custom_cursor_cx;
+			cursor_cy = data->custom_cursor_cy;
+			hotspot_x = cursor_cx / 2;  // Center hotspot for PNG
+			hotspot_y = cursor_cy / 2;
+			blog(LOG_INFO, "[cursor_draw] Using PNG: force=%d inside=%d pos=(%ld,%ld)", force_png, inside_window, x, y);
+		} else {
+			cursor_texture = data->texture;
+			cursor_cx = data->last_cx;
+			cursor_cy = data->last_cy;
+			hotspot_x = data->x_hotspot;
+			hotspot_y = data->y_hotspot;
+			blog(LOG_INFO, "[cursor_draw] Using system cursor fallback: pos=(%ld,%ld)", x, y);
+		}
+		
+	} else {
+		// Window is focused and cursor is inside - use real system cursor
+		cursor_texture = data->texture;
+		cursor_cx = data->last_cx;
+		cursor_cy = data->last_cy;
+		hotspot_x = data->x_hotspot;
+		hotspot_y = data->y_hotspot;
+		
+		blog(LOG_INFO, "[cursor_draw] Inside window focused: pos=(%ld,%ld) texture=%p", x, y, cursor_texture);
+	}
+	
+	long x_draw = x - hotspot_x;
+	long y_draw = y - hotspot_y;
 
-	if (x < 0 || x > width || y < 0 || y > height)
-		return;
+	blog(LOG_INFO, "[cursor_draw] visible=%d cursor_texture=%p draw_pos=(%ld,%ld)", 
+	     data->visible, cursor_texture, x_draw, y_draw);
 
-	if (data->visible && !!data->texture) {
+	if (data->visible && cursor_texture) {
+		gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+		
 		gs_blend_state_push();
-		enum gs_blend_type blendMode = data->monochrome ? GS_BLEND_INVDSTCOLOR : GS_BLEND_SRCALPHA;
-		gs_blend_function_separate(blendMode, /*src_color*/
-					   GS_BLEND_INVSRCALPHA /*dest_color*/, GS_BLEND_ONE /*src_alpha*/,
-					   GS_BLEND_INVSRCALPHA /*dest_alpha*/);
+		gs_blend_function(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA);
 
 		gs_matrix_push();
-		obs_source_draw(data->texture, x_draw, y_draw, 0, 0, false);
+		gs_matrix_translate3f((float)x_draw, (float)y_draw, 0.0f);
+		
+		while (gs_effect_loop(effect, "Draw")) {
+			gs_effect_set_texture(gs_effect_get_param_by_name(effect, "image"), cursor_texture);
+			gs_draw_sprite(cursor_texture, 0, 0, 0);
+		}
+		
 		gs_matrix_pop();
 
 		gs_blend_state_pop();
+		blog(LOG_INFO, "[cursor_draw] Drew cursor successfully with effect");
+	} else {
+		blog(LOG_INFO, "[cursor_draw] Skipped drawing: visible=%d texture=%p", data->visible, cursor_texture);
+	}
+}
+
+void cursor_data_init(struct cursor_data *data)
+{
+	// Load custom cursor PNG from data folder
+	char *cursor_file = obs_module_file("cursor.png");
+	blog(LOG_INFO, "[cursor_data_init] cursor_file path: %s", cursor_file ? cursor_file : "NULL");
+	
+	if (cursor_file) {
+		gs_image_file4_t image = {0};
+		gs_image_file4_init(&image, cursor_file, GS_IMAGE_ALPHA_PREMULTIPLY);
+		
+		obs_enter_graphics();
+		gs_image_file4_init_texture(&image);
+		
+		struct gs_image_file *img = &image.image3.image2.image;
+		if (img->texture) {
+			data->custom_cursor_texture = img->texture;
+			data->custom_cursor_cx = img->cx;
+			data->custom_cursor_cy = img->cy;
+			blog(LOG_INFO, "[cursor_data_init] PNG cursor loaded successfully: %dx%d", img->cx, img->cy);
+			// Don't free the texture, we'll keep using it
+			img->texture = NULL;
+		} else {
+			blog(LOG_WARNING, "[cursor_data_init] Failed to load PNG cursor texture");
+		}
+		
+		obs_leave_graphics();
+		gs_image_file4_free(&image);
+		bfree(cursor_file);
+	} else {
+		blog(LOG_WARNING, "[cursor_data_init] cursor.png file not found");
 	}
 }
 
@@ -253,5 +356,12 @@ void cursor_data_free(struct cursor_data *data)
 		gs_texture_destroy(pcc->texture);
 	}
 	da_free(data->cached_textures);
+	
+	obs_enter_graphics();
+	if (data->custom_cursor_texture) {
+		gs_texture_destroy(data->custom_cursor_texture);
+	}
+	obs_leave_graphics();
+	
 	memset(data, 0, sizeof(*data));
 }

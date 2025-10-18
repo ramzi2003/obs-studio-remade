@@ -22,7 +22,7 @@
 #include <RTWorkQ.h>
 #include <wrl/implements.h>
 
-using namespace std;
+// using namespace std; // Removed to avoid byte conflict with Windows headers
 
 #define OPT_DEVICE_ID "device_id"
 #define OPT_USE_DEVICE_TIMING "use_device_timing"
@@ -147,9 +147,9 @@ class WASAPISource {
 
 	obs_source_t *source;
 	obs_weak_source_t *reroute_target = nullptr;
-	wstring default_id;
-	string device_id;
-	string device_name;
+	std::wstring default_id;
+	std::string device_id;
+	std::string device_name;
 	WinModule mmdevapi_module;
 	PFN_ActivateAudioInterfaceAsync activate_audio_interface_async = NULL;
 	PFN_RtwqUnlockWorkQueue rtwq_unlock_work_queue = NULL;
@@ -159,9 +159,9 @@ class WASAPISource {
 	PFN_RtwqPutWaitingWorkItem rtwq_put_waiting_work_item = NULL;
 	bool rtwq_supported = false;
 	window_priority priority;
-	string window_class;
-	string title;
-	string executable;
+	std::string window_class;
+	std::string title;
+	std::string executable;
 	HWND hwnd = NULL;
 	DWORD process_id = 0;
 	const SourceType sourceType;
@@ -228,7 +228,7 @@ class WASAPISource {
 	audio_format format;
 	uint32_t sampleRate;
 
-	vector<BYTE> silence;
+	std::vector<BYTE> silence;
 
 	static DWORD WINAPI ReconnectThread(LPVOID param);
 	static DWORD WINAPI CaptureThread(LPVOID param);
@@ -239,7 +239,7 @@ class WASAPISource {
 	void Stop();
 
 	static ComPtr<IMMDevice> InitDevice(IMMDeviceEnumerator *enumerator, bool isDefaultDevice, SourceType type,
-					    const string device_id);
+					    const std::string device_id);
 	static ComPtr<IAudioClient> InitClient(IMMDevice *device, SourceType type, DWORD process_id,
 					       PFN_ActivateAudioInterfaceAsync activate_audio_interface_async,
 					       speaker_layout &speakers, audio_format &format, uint32_t &sampleRate);
@@ -252,13 +252,13 @@ class WASAPISource {
 	bool TryInitialize();
 
 	struct UpdateParams {
-		string device_id;
+		std::string device_id;
 		bool useDeviceTiming;
 		bool isDefaultDevice;
 		window_priority priority;
-		string window_class;
-		string title;
-		string executable;
+		std::string window_class;
+		std::string title;
+		std::string executable;
 	};
 
 	UpdateParams BuildUpdateParams(obs_data_t *settings);
@@ -581,7 +581,7 @@ void WASAPISource::Deactivate()
 }
 
 ComPtr<IMMDevice> WASAPISource::InitDevice(IMMDeviceEnumerator *enumerator, bool isDefaultDevice, SourceType type,
-					   const string device_id)
+					   const std::string device_id)
 {
 	ComPtr<IMMDevice> device;
 
@@ -1457,7 +1457,7 @@ static bool UpdateWASAPIMethod(obs_properties_t *props, obs_property_t *, obs_da
 static obs_properties_t *GetWASAPIPropertiesInput(void *)
 {
 	obs_properties_t *props = obs_properties_create();
-	vector<AudioDeviceInfo> devices;
+	std::vector<AudioDeviceInfo> devices;
 
 	obs_property_t *device_prop = obs_properties_add_list(props, OPT_DEVICE_ID, obs_module_text("Device"),
 							      OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
@@ -1480,7 +1480,7 @@ static obs_properties_t *GetWASAPIPropertiesInput(void *)
 static obs_properties_t *GetWASAPIPropertiesDeviceOutput(void *)
 {
 	obs_properties_t *props = obs_properties_create();
-	vector<AudioDeviceInfo> devices;
+	std::vector<AudioDeviceInfo> devices;
 
 	obs_property_t *device_prop = obs_properties_add_list(props, OPT_DEVICE_ID, obs_module_text("Device"),
 							      OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);

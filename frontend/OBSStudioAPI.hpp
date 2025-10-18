@@ -19,9 +19,10 @@
 
 #include <obs-frontend-internal.hpp>
 
-class OBSBasic;
+#include <vector>
+#include <string>
 
-using namespace std;
+class OBSBasic;
 
 template<typename T> struct OBSStudioCallback {
 	T callback;
@@ -32,9 +33,9 @@ template<typename T> struct OBSStudioCallback {
 
 struct OBSStudioAPI : obs_frontend_callbacks {
 	OBSBasic *main;
-	vector<OBSStudioCallback<obs_frontend_event_cb>> callbacks;
-	vector<OBSStudioCallback<obs_frontend_save_cb>> saveCallbacks;
-	vector<OBSStudioCallback<obs_frontend_save_cb>> preloadCallbacks;
+	std::vector<OBSStudioCallback<obs_frontend_event_cb>> callbacks;
+	std::vector<OBSStudioCallback<obs_frontend_save_cb>> saveCallbacks;
+	std::vector<OBSStudioCallback<obs_frontend_save_cb>> preloadCallbacks;
 
 	inline OBSStudioAPI(OBSBasic *main_) : main(main_) {}
 

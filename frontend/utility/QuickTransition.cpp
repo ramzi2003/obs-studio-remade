@@ -21,6 +21,8 @@
 
 #include <qt-wrappers.hpp>
 
+using namespace std;
+
 static inline QString MakeQuickTransitionText(QuickTransition *qt)
 {
 	QString name;

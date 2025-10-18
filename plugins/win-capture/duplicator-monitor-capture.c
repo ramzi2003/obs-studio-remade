@@ -428,6 +428,9 @@ static void *duplicator_capture_create(obs_data_t *settings, obs_source_t *sourc
 
 	capture = bzalloc(sizeof(struct duplicator_capture));
 	capture->source = source;
+	
+	// Initialize custom cursor
+	cursor_data_init(&capture->cursor_data);
 
 	pthread_mutex_init(&capture->update_mutex, NULL);
 
@@ -619,7 +622,7 @@ static void draw_cursor(struct duplicator_capture *capture)
 {
 	cursor_draw(&capture->cursor_data, -capture->x, -capture->y,
 		    capture->rot % 180 == 0 ? capture->width : capture->height,
-		    capture->rot % 180 == 0 ? capture->height : capture->width);
+		    capture->rot % 180 == 0 ? capture->height : capture->width, false);
 }
 
 static void duplicator_capture_render(void *data, gs_effect_t *unused)

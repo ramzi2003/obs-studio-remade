@@ -17,7 +17,12 @@
 
 #include "OBSApp.hpp"
 
+#include <QMainWindow>
+#include <QDockWidget>
+#include <QScreen>
+#include <QApplication>
 #include <components/Multiview.hpp>
+#include <widgets/OBSBasic.hpp>
 #include <dialogs/LogUploadDialog.hpp>
 #include <plugin-manager/PluginManager.hpp>
 #include <utility/CrashHandler.hpp>
@@ -26,7 +31,6 @@
 #if defined(_WIN32) || defined(ENABLE_SPARKLE_UPDATER)
 #include <utility/models/branches.hpp>
 #endif
-#include <widgets/OBSBasic.hpp>
 
 #if !defined(_WIN32) && !defined(__APPLE__)
 #include <obs-nix-platform.h>
@@ -891,7 +895,7 @@ OBSApp::OBSApp(int &argc, char **argv, profiler_name_store_t *store)
 	sleepInhibitor = os_inhibit_sleep_create("OBS Video/audio");
 
 #ifndef __APPLE__
-	setWindowIcon(QIcon::fromTheme("obs", QIcon(":/res/images/obs.png")));
+	setWindowIcon(QIcon(":/res/images/obs.png"));
 #endif
 
 	setDesktopFileName("com.obsproject.Studio");
@@ -1230,6 +1234,15 @@ bool OBSApp::OBSInit()
 
 	mainWindow->setAttribute(Qt::WA_DeleteOnClose, true);
 	connect(mainWindow, &OBSBasic::destroyed, this, &OBSApp::quit);
+
+	// Initialize recording overlay as child of main window
+	recordingOverlay = new RecordingOverlay(mainWindow);
+	connect(recordingOverlay, &RecordingOverlay::stopRecording, this, &OBSApp::onRecordingStopped);
+	connect(recordingOverlay, &RecordingOverlay::pauseRecording, this, &OBSApp::onRecordingPaused);
+	connect(recordingOverlay, &RecordingOverlay::resumeRecording, this, &OBSApp::onRecordingResumed);
+	connect(recordingOverlay, &RecordingOverlay::toggleMute, this, [this]() {
+		// Toggle mute functionality would go here
+	});
 
 	mainWindow->OBSInit();
 
@@ -1822,4 +1835,102 @@ void OBSApp::loadAppModules(struct obs_module_failure_info &mfi)
 void OBSApp::pluginManagerOpenDialog()
 {
 	pluginManager_->open();
+}
+
+// Recording overlay methods
+void OBSApp::showRecordingOverlay()
+{
+	if (recordingOverlay && mainWindow) {
+		// Hide main window UI elements
+		mainWindow->centralWidget()->setVisible(false);
+		mainWindow->menuBar()->setVisible(false);
+		mainWindow->statusBar()->setVisible(false);
+		
+		// Hide dock widgets using public method
+		OBSBasic* basicWindow = qobject_cast<OBSBasic*>(mainWindow);
+		if (basicWindow) {
+			basicWindow->hideDockWidgets();
+		}
+		
+		// Set main window to show overlay content (frameless)
+		mainWindow->setWindowTitle("Recording toolbar");
+		mainWindow->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+		mainWindow->setAttribute(Qt::WA_TranslucentBackground, true);
+		mainWindow->setAttribute(Qt::WA_NoSystemBackground, true);
+		mainWindow->setStyleSheet("QMainWindow { background-color: transparent; }");
+		mainWindow->setFixedSize(260, 35);
+		
+		// Position at top center of screen
+		QScreen *screen = QApplication::primaryScreen();
+		QRect screenGeometry = screen->availableGeometry();
+		int x = screenGeometry.x() + (screenGeometry.width() - 260) / 2;
+		int y = screenGeometry.y() + 20; // 20px from top
+		mainWindow->move(x, y);
+		
+		// Embed overlay into main window and start timer
+		recordingOverlay->setGeometry(0, 0, 260, 35);
+		recordingOverlay->show();
+		// Start the recording timer and lock cursor
+		recordingOverlay->startTimer();
+		recordingOverlay->lockCursor();
+		
+		// Keep main window visible but with overlay content
+		mainWindow->show();
+	}
+}
+
+void OBSApp::hideRecordingOverlay()
+{
+	if (recordingOverlay && mainWindow) {
+		// Hide the overlay, stop timer, and unlock cursor
+		recordingOverlay->hide();
+		recordingOverlay->stopTimer();
+		recordingOverlay->unlockCursor();
+		
+		// Restore main window UI elements
+		mainWindow->centralWidget()->setVisible(true);
+		mainWindow->menuBar()->setVisible(true);
+		mainWindow->statusBar()->setVisible(true);
+		
+		// Show dock widgets using public method
+		OBSBasic* basicWindow = qobject_cast<OBSBasic*>(mainWindow);
+		if (basicWindow) {
+			basicWindow->showDockWidgets();
+		}
+		
+		// Restore main window properties
+		mainWindow->setWindowTitle("OBS 32.0.1-modified - Profile: Untitled - Scenes: Untitled");
+		mainWindow->setWindowFlags(Qt::Window); // Restore normal window flags
+		mainWindow->setStyleSheet(""); // Reset stylesheet
+		mainWindow->setMinimumSize(0, 0);
+		mainWindow->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+		mainWindow->resize(1200, 800); // Restore default size
+		
+		// Main window stays visible with restored content
+		mainWindow->show();
+	}
+}
+
+void OBSApp::onRecordingStarted()
+{
+	showRecordingOverlay();
+}
+
+void OBSApp::onRecordingStopped()
+{
+	hideRecordingOverlay();
+}
+
+void OBSApp::onRecordingPaused()
+{
+	if (recordingOverlay) {
+		recordingOverlay->onPauseClicked();
+	}
+}
+
+void OBSApp::onRecordingResumed()
+{
+	if (recordingOverlay) {
+		recordingOverlay->onPauseClicked();
+	}
 }

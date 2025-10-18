@@ -18,7 +18,7 @@
 
 #include <vector>
 
-using namespace std;
+// using namespace std; // Removed to avoid byte conflict with Windows headers
 
 /* ------------------------------------------------------------------------ */
 
@@ -54,7 +54,7 @@ constexpr const char *kDeltaMagic = "BOUF//ZSTD//DICT";
 constexpr int kMagicSize = 16;
 constexpr int kHeaderSize = kMagicSize + 8; // magic + int64_t delta size
 
-int ApplyPatch(ZSTD_DCtx *zstdCtx, const std::byte *patch_data, const size_t patch_size, const wchar_t *targetFile)
+int ApplyPatch(ZSTD_DCtx *zstdCtx, const uint8_t *patch_data, const size_t patch_size, const wchar_t *targetFile)
 try {
 	int64_t newsize;
 	bool success;
@@ -81,7 +81,7 @@ try {
 	if (newsize < 0 || newsize >= 0x7ffffffff)
 		throw int(-5);
 
-	vector<std::byte> newData;
+	std::vector<uint8_t> newData;
 	try {
 		newData.resize((size_t)newsize);
 	} catch (...) {
@@ -98,7 +98,7 @@ try {
 	if (oldFileSize == INVALID_FILE_SIZE)
 		throw int(GetLastError());
 
-	vector<std::byte> oldData;
+	std::vector<uint8_t> oldData;
 	try {
 		oldData.resize(oldFileSize);
 	} catch (...) {

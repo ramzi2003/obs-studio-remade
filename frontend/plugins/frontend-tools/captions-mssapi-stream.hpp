@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+
 #include <sapi.h>
 #include <condition_variable>
 #include <mutex>

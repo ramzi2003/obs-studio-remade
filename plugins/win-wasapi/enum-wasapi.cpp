@@ -6,11 +6,11 @@
 #include <util/windows/ComPtr.hpp>
 #include <util/windows/CoTaskMemPtr.hpp>
 
-using namespace std;
+// using namespace std; // Removed to avoid byte conflict with Windows headers
 
-string GetDeviceName(IMMDevice *device)
+std::string GetDeviceName(IMMDevice *device)
 {
-	string device_name;
+	std::string device_name;
 	ComPtr<IPropertyStore> store;
 	HRESULT res;
 
@@ -34,7 +34,7 @@ string GetDeviceName(IMMDevice *device)
 	return device_name;
 }
 
-static void GetWASAPIAudioDevices_(vector<AudioDeviceInfo> &devices, bool input)
+static void GetWASAPIAudioDevices_(std::vector<AudioDeviceInfo> &devices, bool input)
 {
 	ComPtr<IMMDeviceEnumerator> enumerator;
 	ComPtr<IMMDeviceCollection> collection;
@@ -79,7 +79,7 @@ static void GetWASAPIAudioDevices_(vector<AudioDeviceInfo> &devices, bool input)
 	}
 }
 
-void GetWASAPIAudioDevices(vector<AudioDeviceInfo> &devices, bool input)
+void GetWASAPIAudioDevices(std::vector<AudioDeviceInfo> &devices, bool input)
 {
 	devices.clear();
 

@@ -4,8 +4,34 @@
 #include <util/windows/window-helpers.h>
 
 #include "dc-capture.h"
+#include "cursor-capture.h"
 #include "audio-helpers.h"
 #include "compat-helpers.h"
+
+// Windows message constants for window activation spoofing
+#ifndef WM_NCACTIVATE
+#define WM_NCACTIVATE 0x0086
+#endif
+#ifndef WM_ACTIVATE
+#define WM_ACTIVATE 0x0006
+#endif
+#ifndef WA_ACTIVE
+#define WA_ACTIVE 1
+#endif
+
+// DWM API constants for window visual state override
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+
+// Function pointer for DWM API
+typedef HRESULT (WINAPI *DwmSetWindowAttributeFunc)(HWND hwnd, DWORD dwAttribute, LPCVOID pvAttribute, DWORD cbAttribute);
+
+// DWM API function pointer
+static DwmSetWindowAttributeFunc pDwmSetWindowAttribute = NULL;
 #ifdef OBS_LEGACY
 #include "../../libobs/util/platform.h"
 #include "../../libobs-winrt/winrt-capture.h"
@@ -92,6 +118,7 @@ struct window_capture {
 	bool capture_audio;
 
 	struct dc_capture capture;
+	struct cursor_data cursor_data;  // Add cursor_data for PNG cursor fallback
 
 	bool previously_failed;
 	void *winrt_module;
@@ -330,6 +357,16 @@ static void *wc_create(obs_data_t *settings, obs_source_t *source)
 	}
 	wc->hooked = false;
 
+	cursor_data_init(&wc->cursor_data);
+
+	// Initialize DWM API for window activation spoofing
+	if (!pDwmSetWindowAttribute) {
+		HMODULE hDwmApi = LoadLibrary(L"dwmapi.dll");
+		if (hDwmApi) {
+			pDwmSetWindowAttribute = (DwmSetWindowAttributeFunc)GetProcAddress(hDwmApi, "DwmSetWindowAttribute");
+		}
+	}
+
 	signal_handler_t *sh = obs_source_get_signal_handler(source);
 	signal_handler_add(sh, "void unhooked(ptr source)");
 	signal_handler_add(sh, "void hooked(ptr source, string title, string class, string executable)");
@@ -357,6 +394,8 @@ static void wc_actual_destroy(void *data)
 	obs_enter_graphics();
 	dc_capture_free(&wc->capture);
 	obs_leave_graphics();
+
+	cursor_data_free(&wc->cursor_data);
 
 	bfree(wc->title);
 	bfree(wc->class);
@@ -648,15 +687,38 @@ static void wc_tick(void *data, float seconds)
 	if (wc->cursor_check_time >= CURSOR_CHECK_TIME) {
 		DWORD foreground_pid, target_pid;
 
-		// Can't just compare the window handle in case of app with child windows
-		if (!GetWindowThreadProcessId(GetForegroundWindow(), &foreground_pid))
-			foreground_pid = 0;
+	// Can't just compare the window handle in case of app with child windows
+	if (!GetWindowThreadProcessId(GetForegroundWindow(), &foreground_pid))
+		foreground_pid = 0;
 
-		if (!GetWindowThreadProcessId(wc->window, &target_pid))
-			target_pid = 0;
+	if (!GetWindowThreadProcessId(wc->window, &target_pid))
+		target_pid = 0;
 
-		const bool cursor_hidden = foreground_pid && target_pid && foreground_pid != target_pid;
-		wc->capture.cursor_hidden = cursor_hidden;
+	const bool cursor_hidden = (foreground_pid != target_pid); // Hide cursor when window not focused
+	wc->capture.cursor_hidden = cursor_hidden;
+
+	// Force window to always appear active in recording (visual-only, no focus interference)
+	if (wc->window && IsWindow(wc->window)) {
+		HWND current_fg = GetForegroundWindow();
+		
+		// Only apply visual spoofing when window is NOT the foreground window
+		if (current_fg != wc->window) {
+			// Method 1: Send visual activation messages (no focus change)
+			SendMessage(wc->window, WM_NCACTIVATE, TRUE, 0);
+			
+			// Method 2: Force visual refresh without changing focus
+			SendMessage(wc->window, WM_PAINT, 0, 0);
+			InvalidateRect(wc->window, NULL, TRUE);
+			
+			// Method 3: Use DWM API to override visual state (if available)
+			if (pDwmSetWindowAttribute) {
+				BOOL active = TRUE;
+				pDwmSetWindowAttribute(wc->window, DWMWA_USE_IMMERSIVE_DARK_MODE, &active, sizeof(active));
+			}
+			
+			blog(LOG_INFO, "[window-capture] Applied visual-only activation spoofing - window should appear active in recording");
+		}
+	}
 		if (wc->capture_winrt && !wc->exports.winrt_capture_show_cursor(wc->capture_winrt, !cursor_hidden)) {
 			force_reset(wc);
 			if (wc->hooked) {
@@ -770,6 +832,12 @@ static void wc_tick(void *data, float seconds)
 	}
 
 	obs_leave_graphics();
+
+	// Only capture cursor state when window is focused (not using PNG fallback)
+	// This ensures the PNG cursor position is frozen when window loses focus
+	if (wc->cursor && !wc->capture.cursor_hidden) {
+		cursor_capture(&wc->cursor_data);
+	}
 }
 
 static void wc_render(void *data, gs_effect_t *effect)
@@ -790,6 +858,29 @@ static void wc_render(void *data, gs_effect_t *effect)
 		}
 	} else {
 		dc_capture_render(&wc->capture, obs_source_get_texcoords_centered(wc->source));
+	}
+
+	// Draw cursor with PNG fallback when window is not focused
+	if (wc->cursor && wc->capture.cursor_hidden) {
+		blog(LOG_INFO, "[wc_render] Drawing PNG cursor fallback (cursor_hidden=true)");
+		
+		// Force cursor to be visible for PNG fallback
+		bool original_visible = wc->cursor_data.visible;
+		wc->cursor_data.visible = true;
+		
+		RECT rect;
+		GetClientRect(wc->window, &rect);
+		long x_offset = wc->client_area ? 0 : -wc->capture.x;
+		long y_offset = wc->client_area ? 0 : -wc->capture.y;
+		
+		blog(LOG_INFO, "[wc_render] rect=(%ld,%ld,%ld,%ld) offset=(%ld,%ld) has_valid_pos=%d custom_texture=%p",
+		     rect.left, rect.top, rect.right, rect.bottom, x_offset, y_offset,
+		     wc->cursor_data.has_valid_pos, wc->cursor_data.custom_cursor_texture);
+		
+		cursor_draw(&wc->cursor_data, x_offset, y_offset, rect.right - rect.left, rect.bottom - rect.top, true);
+		
+		// Restore original visible state
+		wc->cursor_data.visible = original_visible;
 	}
 
 	UNUSED_PARAMETER(effect);

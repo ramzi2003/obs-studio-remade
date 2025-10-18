@@ -2,6 +2,7 @@
 
 #include <util/windows/obfuscate.h>
 
+#include <stdlib.h>
 #include <dwmapi.h>
 #include <psapi.h>
 

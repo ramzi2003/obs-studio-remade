@@ -37,9 +37,6 @@
 #include <QPushButton>
 #include <curl/curl.h>
 
-#include <fstream>
-#include <iostream>
-#include <sstream>
 #ifdef _WIN32
 #include <shellapi.h>
 #define WIN32_LEAN_AND_MEAN
@@ -47,6 +44,10 @@
 #else
 #include <signal.h>
 #endif
+
+#include <fstream>
+#include <iostream>
+#include <sstream>
 
 using namespace std;
 

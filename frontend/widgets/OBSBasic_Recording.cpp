@@ -161,6 +161,9 @@ void OBSBasic::RecordingStart()
 
 	recordingStopping = false;
 	OnEvent(OBS_FRONTEND_EVENT_RECORDING_STARTED);
+	
+	// Show recording overlay
+	App()->onRecordingStarted();
 
 	if (!diskFullTimer->isActive())
 		diskFullTimer->start(1000);
@@ -179,6 +182,9 @@ void OBSBasic::RecordingStop(int code, QString last_error)
 		sysTrayRecord->setText(QTStr("Basic.Main.StartRecording"));
 
 	blog(LOG_INFO, RECORDING_STOP);
+	
+	// Hide recording overlay
+	App()->onRecordingStopped();
 
 	if (code == OBS_OUTPUT_UNSUPPORTED && isVisible()) {
 		OBSMessageBox::critical(this, QTStr("Output.RecordFail.Title"), QTStr("Output.RecordFail.Unsupported"));
@@ -297,6 +303,9 @@ void OBSBasic::PauseRecording()
 		}
 
 		OnEvent(OBS_FRONTEND_EVENT_RECORDING_PAUSED);
+		
+		// Update recording overlay
+		App()->onRecordingPaused();
 
 		if (os_atomic_load_bool(&replaybuf_active))
 			ShowReplayBufferPauseWarning();
@@ -330,6 +339,9 @@ void OBSBasic::UnpauseRecording()
 		}
 
 		OnEvent(OBS_FRONTEND_EVENT_RECORDING_UNPAUSED);
+		
+		// Update recording overlay
+		App()->onRecordingResumed();
 	}
 }
 

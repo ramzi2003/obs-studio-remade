@@ -700,24 +700,24 @@ private:
 			ClearProcessPriority();
 
 			TaskbarOverlaySetStatus(TaskbarOverlayStatusInactive);
-			if (trayIcon && trayIcon->isVisible()) {
+		if (trayIcon && trayIcon->isVisible()) {
 #ifdef __APPLE__
-				QIcon trayIconFile = QIcon(":/res/images/obs_macos.svg");
-				trayIconFile.setIsMask(true);
+			QIcon trayIconFile = QIcon(":/res/images/obs_macos.svg");
+			trayIconFile.setIsMask(true);
 #else
-				QIcon trayIconFile = QIcon(":/res/images/obs.png");
+			QIcon trayIconFile = QIcon(":/res/images/obs.png");
 #endif
-				trayIcon->setIcon(QIcon::fromTheme("obs-tray", trayIconFile));
+			trayIcon->setIcon(QIcon::fromTheme("obs-tray", trayIconFile));
 			}
 		} else if (outputHandler->Active() && trayIcon && trayIcon->isVisible()) {
-			if (os_atomic_load_bool(&recording_paused)) {
+		if (os_atomic_load_bool(&recording_paused)) {
 #ifdef __APPLE__
-				QIcon trayIconFile = QIcon(":/res/images/obs_paused_macos.svg");
-				trayIconFile.setIsMask(true);
+			QIcon trayIconFile = QIcon(":/res/images/obs_paused_macos.svg");
+			trayIconFile.setIsMask(true);
 #else
-				QIcon trayIconFile = QIcon(":/res/images/obs_paused.png");
+			QIcon trayIconFile = QIcon(":/res/images/obs_paused.png");
 #endif
-				trayIcon->setIcon(QIcon::fromTheme("obs-tray-paused", trayIconFile));
+			trayIcon->setIcon(QIcon::fromTheme("obs-tray-paused", trayIconFile));
 				TaskbarOverlaySetStatus(TaskbarOverlayStatusPaused);
 			} else {
 #ifdef __APPLE__
@@ -999,6 +999,10 @@ public slots:
 
 	void PauseRecording();
 	void UnpauseRecording();
+	
+	// Dock widget visibility methods
+	void hideDockWidgets();
+	void showDockWidgets();
 
 	void CheckDiskSpaceRemaining();
 
