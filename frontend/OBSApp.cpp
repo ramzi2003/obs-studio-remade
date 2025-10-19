@@ -1864,7 +1864,7 @@ void OBSApp::showRecordingOverlay()
 		QScreen *screen = QApplication::primaryScreen();
 		QRect screenGeometry = screen->availableGeometry();
 		int x = screenGeometry.x() + (screenGeometry.width() - 260) / 2;
-		int y = screenGeometry.y() + 20; // 20px from top
+		int y = screenGeometry.y() - 10; // 10px above top edge
 		mainWindow->move(x, y);
 		
 		// Embed overlay into main window and start timer

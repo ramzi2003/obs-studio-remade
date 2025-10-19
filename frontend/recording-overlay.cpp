@@ -219,40 +219,36 @@ void RecordingOverlay::setupUI()
 	
 	mainLayout->addWidget(m_controlBar);
 	
-	// Set up opacity effect for fade animation
-	m_opacityEffect = new QGraphicsOpacityEffect(this);
-	m_controlBar->setGraphicsEffect(m_opacityEffect);
-	
-	// Set up fade animation
-	m_fadeAnimation = new QPropertyAnimation(m_opacityEffect, "opacity", this);
-	m_fadeAnimation->setDuration(300);
-	m_fadeAnimation->setStartValue(0.0);
-	m_fadeAnimation->setEndValue(1.0);
+	// No opacity effect - show overlay with full opacity immediately
+	m_opacityEffect = nullptr;
+	m_fadeAnimation = nullptr;
 }
 
 void RecordingOverlay::showOverlay()
 {
 	// Position at top center of screen - match your design
 	QScreen *screen = QApplication::primaryScreen();
-	QRect screenGeometry = screen->availableGeometry();
+	QRect screenGeometry = screen->geometry();
+	QRect availableGeometry = screen->availableGeometry();
 	
 	// Set a fixed width for the control bar (like your design)
 	setFixedWidth(300);
 	setFixedHeight(50);
 	
-	int x = (screenGeometry.width() - width()) / 2;
-	int y = 20; // 20px from top
+	// Position relative to available geometry but use screen coordinates
+	int x = availableGeometry.x() + (availableGeometry.width() - width()) / 2;
+	int y = availableGeometry.y() + 6; // 6px from top of available area
 	
+	// Try multiple positioning methods
 	move(x, y);
+	setGeometry(x, y, width(), height());
 	
 	// Start timer
 	m_elapsedTimer->start();
 	m_timer->start(100); // Update every 100ms
 	
-	// Show with fade animation
+	// Show immediately with full opacity
 	show();
-	m_fadeAnimation->setDirection(QPropertyAnimation::Forward);
-	m_fadeAnimation->start();
 }
 
 void RecordingOverlay::startTimer()
@@ -272,11 +268,9 @@ void RecordingOverlay::stopTimer()
 void RecordingOverlay::hideOverlay()
 {
 	m_timer->stop();
-	m_fadeAnimation->setDirection(QPropertyAnimation::Backward);
-	m_fadeAnimation->start();
 	
-	// Hide after animation
-	connect(m_fadeAnimation, &QPropertyAnimation::finished, this, &QWidget::hide);
+	// Hide immediately
+	hide();
 }
 
 void RecordingOverlay::updateTimer()
